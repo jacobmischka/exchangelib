@@ -67,6 +67,7 @@ class ExtendedProperty(EWSElement):
     property_set_id = None
     property_tag = None  # hex integer (e.g. 0x8000) or string ('0x8000')
     property_name = None
+    property_long_id = None
     property_id = None  # integer as hex-formatted int (e.g. 0x8000) or normal int (32768)
     property_type = None
 
@@ -82,24 +83,27 @@ class ExtendedProperty(EWSElement):
     def clean(self, version=None):
         if self.distinguished_property_set_id:
             assert not any([self.property_set_id, self.property_tag])
-            assert any([self.property_id, self.property_name])
+            assert any([self.property_id, self.property_name, self.property_long_id])
             assert self.distinguished_property_set_id in self.DISTINGUISHED_SETS
         if self.property_set_id:
             assert not any([self.distinguished_property_set_id, self.property_tag])
-            assert any([self.property_id, self.property_name])
+            assert any([self.property_id, self.property_name, self.property_long_id])
         if self.property_tag:
             assert not any([
-                self.distinguished_property_set_id, self.property_set_id, self.property_name, self.property_id
+                self.distinguished_property_set_id, self.property_set_id, self.property_name, self.property_id, self.property_long_id
             ])
             if 0x8000 <= self.property_tag_as_int() <= 0xFFFE:
                 raise ValueError(
                     "'property_tag' value '%s' is reserved for custom properties" % self.property_tag_as_hex()
                 )
         if self.property_name:
-            assert not any([self.property_id, self.property_tag])
+            assert not any([self.property_id, self.property_tag, self.property_long_id])
+            assert any([self.distinguished_property_set_id, self.property_set_id])
+        if self.property_long_id:
+            assert not any([self.property_id, self.property_tag, self.property_name])
             assert any([self.distinguished_property_set_id, self.property_set_id])
         if self.property_id:
-            assert not any([self.property_name, self.property_tag])
+            assert not any([self.property_name, self.property_tag, self.property_long_id])
             assert any([self.distinguished_property_set_id, self.property_set_id])
         assert self.property_type in self.PROPERTY_TYPES
 
@@ -157,14 +161,30 @@ class ExtendedProperty(EWSElement):
         return cls.property_type and 'Binary' in cls.property_type
 
     @classmethod
+    def property_long_id_as_int(cls):
+        return cls.property_as_int(cls.property_long_id)
+
+    @classmethod
+    def property_long_id_as_hex(cls):
+        return cls.property_as_hex(cls.property_long_id)
+
+    @classmethod
     def property_tag_as_int(cls):
-        if isinstance(cls.property_tag, string_types):
-            return int(cls.property_tag, base=16)
-        return cls.property_tag
+        return cls.property_as_int(cls.property_tag)
 
     @classmethod
     def property_tag_as_hex(cls):
-        return hex(cls.property_tag) if isinstance(cls.property_tag, int) else cls.property_tag
+        return cls.property_as_hex(cls.property_tag)
+
+    @staticmethod
+    def property_as_int(prop):
+        if isinstance(prop, string_types):
+            return int(prop, base=16)
+        return prop
+
+    @staticmethod
+    def property_as_hex(prop):
+        return hex(prop) if isinstance(prop, int) else prop
 
     @classmethod
     def python_type(cls):
@@ -193,6 +213,7 @@ class ExtendedProperty(EWSElement):
             'PropertySetId': cls.property_set_id.lower() if cls.property_set_id else None,
             'PropertyTag': cls.property_tag_as_hex(),
             'PropertyName': cls.property_name,
+            'PropertyLongId': cls.property_long_id_as_hex(),
             'PropertyId': value_to_xml_text(cls.property_id) if cls.property_id else None,
             'PropertyType': cls.property_type,
         }
